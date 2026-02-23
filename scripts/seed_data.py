@@ -51,16 +51,35 @@ def create_tables(cursor):
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS grades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            course_id INTEGER NOT NULL,
+            term1 REAL NOT NULL,
+            term2 REAL NOT NULL,
+            term3 REAL NOT NULL,
+            attendance_score REAL NOT NULL,
+            final_passed INTEGER NOT NULL, -- 1 for Pass, 0 for Fail
+            FOREIGN KEY (student_id) REFERENCES students (id),
+            FOREIGN KEY (course_id) REFERENCES courses (id),
+            UNIQUE(student_id, course_id)
+        )
+    ''')
+
 def insert_sample_data(cursor):
-    """Inserts sample records into students, courses, and attendance tables."""
+    """Inserts sample records into students, courses, attendance, and grades."""
     print("Inserting sample data...")
+    import random
 
     # Sample Students
     students = [
         ('Alice Johnson', 'alice@example.com', 'S101'),
         ('Bob Smith', 'bob@example.com', 'S102'),
         ('Charlie Brown', 'charlie@example.com', 'S103'),
-        ('Diana Prince', 'diana@example.com', 'S104')
+        ('Diana Prince', 'diana@example.com', 'S104'),
+        ('Ethan Hunt', 'ethan@example.com', 'S105'),
+        ('Fiona Gallagher', 'fiona@example.com', 'S106')
     ]
     cursor.executemany('INSERT OR IGNORE INTO students (name, email, student_code) VALUES (?, ?, ?)', students)
 
@@ -72,76 +91,62 @@ def insert_sample_data(cursor):
     ]
     cursor.executemany('INSERT OR IGNORE INTO courses (course_name, course_code) VALUES (?, ?)', courses)
 
-    # Improvement 3: Deterministic data selection using ORDER BY
+    # Fetch IDs
     cursor.execute('SELECT id FROM students ORDER BY student_code')
     student_ids = [row[0] for row in cursor.fetchall()]
 
     cursor.execute('SELECT id FROM courses ORDER BY course_code')
     course_ids = [row[0] for row in cursor.fetchall()]
 
-    # Sample Attendance
-    if student_ids and course_ids:
-        # Use a fixed date for deterministic seeding
-        fixed_date = '2026-02-22'
-        
-        attendance_records = [
-            (student_ids[0], course_ids[0], fixed_date, '09:00:00', 'Present'),
-            (student_ids[1], course_ids[0], fixed_date, '09:05:00', 'Late'),
-            (student_ids[2], course_ids[0], fixed_date, '09:00:00', 'Present'),
-            (student_ids[0], course_ids[1], fixed_date, '11:00:00', 'Present'),
-            (student_ids[3], course_ids[1], fixed_date, '11:10:00', 'Late'),
-            (student_ids[1], course_ids[2], fixed_date, '14:00:00', 'Present')
-        ]
-        # Use INSERT OR IGNORE for idempotency
-        cursor.executemany('''
-            INSERT OR IGNORE INTO attendance (student_id, course_id, attendance_date, check_in_time, status) 
-            VALUES (?, ?, ?, ?, ?)
-        ''', attendance_records)
+    # Sample Attendance (Multiple days for variety)
+    print("Generating attendance and grades...")
+    dates = ['2026-02-20', '2026-02-21', '2026-02-22']
+    
+    for s_id in student_ids:
+        for c_id in course_ids:
+            # Generate random attendance for the 3 days
+            total_present = 0
+            for d in dates:
+                status = random.choice(['Present', 'Present', 'Present', 'Late', 'Absent'])
+                if status in ['Present', 'Late']:
+                    total_present += 1
+                cursor.execute('''
+                    INSERT OR IGNORE INTO attendance (student_id, course_id, attendance_date, check_in_time, status) 
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (s_id, c_id, d, '09:00:00', status))
+            
+            # Attendance Score (Percentage)
+            att_score = (total_present / len(dates)) * 100
+            
+            # Generate random Term Marks (Term 1, 2, 3)
+            t1 = random.uniform(40, 100)
+            t2 = random.uniform(40, 100)
+            t3 = random.uniform(40, 100)
+            
+            # Pass/Fail Logic: (T1*0.2 + T2*0.2 + T3*0.4 + Attendance*0.2) >= 50
+            final_score = (t1 * 0.2) + (t2 * 0.2) + (t3 * 0.4) + (att_score * 0.2)
+            passed = 1 if final_score >= 60 else 0 # Setting threshold higher for "Nice Project" feel
+            
+            cursor.execute('''
+                INSERT OR IGNORE INTO grades (student_id, course_id, term1, term2, term3, attendance_score, final_passed)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (s_id, c_id, t1, t2, t3, att_score, passed))
 
 def run_test_queries(cursor):
     """Executes verification queries to show the state of the database."""
     print("\n--- Testing Queries ---")
     
-    print("\nRecent Attendance Logs:")
+    print("\nStudent Predicted Pass/Fail (based on Grades + Attendance):")
     cursor.execute('''
-        SELECT s.name, c.course_name, a.attendance_date, a.check_in_time, a.status
-        FROM attendance a
-        JOIN students s ON a.student_id = s.id
-        JOIN courses c ON a.course_id = c.id
-        ORDER BY a.attendance_date DESC, a.check_in_time DESC
+        SELECT s.name, c.course_name, g.term1, g.term2, g.term3, g.attendance_score, g.final_passed
+        FROM grades g
+        JOIN students s ON g.student_id = s.id
+        JOIN courses c ON g.course_id = c.id
+        LIMIT 10
     ''')
     for row in cursor.fetchall():
-        print(f"{row['name']} | {row['course_name']} | {row['attendance_date']} {row['check_in_time']} | {row['status']}")
-
-    print("\nStudent Count per Course:")
-    cursor.execute('''
-        SELECT c.course_name, COUNT(a.student_id) as student_count
-        FROM attendance a
-        JOIN courses c ON a.course_id = c.id
-        GROUP BY c.course_name
-    ''')
-    for row in cursor.fetchall():
-        print(f"{row['course_name']}: {row['student_count']} students")
-
-    print("\nStudents below threshold:")
-    cursor.execute('''
-    SELECT 
-        s.id,
-        s.name,
-        s.student_code,
-        COUNT(a.id) AS total_classes,
-        SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) AS present_count,
-        ROUND(
-            (SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) * 100.0) / COUNT(a.id),
-            2
-        ) AS attendance_percentage
-    FROM students s
-    JOIN attendance a ON s.id = a.student_id
-    GROUP BY s.id
-    HAVING attendance_percentage < 75;
-    ''')
-    for row in cursor.fetchall():
-        print(f"{row['name']} | {row['attendance_percentage']} attendance")
+        status = "PASS" if row['final_passed'] == 1 else "FAIL"
+        print(f"{row['name']} | {row['course_name']} | T1: {row['term1']:.1f}, T2: {row['term2']:.1f}, T3: {row['term3']:.1f} | Att: {row['attendance_score']:.1f}% | Result: {status}")
 
 def seed_database():
     """Main function to orchestrate the seeding process."""
@@ -153,7 +158,7 @@ def seed_database():
         create_tables(cursor)
         insert_sample_data(cursor)
         conn.commit()
-        print("Database seeded successfully!")
+        print("Database seeded successfully with Grades and Attendance data!")
         
         run_test_queries(cursor)
     except sqlite3.Error as e:
