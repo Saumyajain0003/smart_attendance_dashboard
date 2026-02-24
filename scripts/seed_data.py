@@ -118,14 +118,14 @@ def insert_sample_data(cursor):
             # Attendance Score (Percentage)
             att_score = (total_present / len(dates)) * 100
             
-            # Generate random Term Marks (Term 1, 2, 3)
-            t1 = random.uniform(40, 100)
-            t2 = random.uniform(40, 100)
-            t3 = random.uniform(40, 100)
+            # Generate wider random Term Marks (Term 1, 2, 3) to ensure some fails
+            t1 = random.uniform(10, 95)
+            t2 = random.uniform(10, 95)
+            t3 = random.uniform(10, 95)
             
-            # Pass/Fail Logic: (T1*0.2 + T2*0.2 + T3*0.4 + Attendance*0.2) >= 50
+            # Pass/Fail Logic: (T1*0.2 + T2*0.2 + T3*0.4 + Attendance*0.2) >= 60
             final_score = (t1 * 0.2) + (t2 * 0.2) + (t3 * 0.4) + (att_score * 0.2)
-            passed = 1 if final_score >= 60 else 0 # Setting threshold higher for "Nice Project" feel
+            passed = 1 if final_score >= 60 else 0 
             
             cursor.execute('''
                 INSERT OR IGNORE INTO grades (student_id, course_id, term1, term2, term3, attendance_score, final_passed)

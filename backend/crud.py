@@ -12,9 +12,13 @@ def get_students_below_threshold(db: Session, threshold: int):
             ROUND(
                 (SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) * 100.0) / COUNT(a.id),
                 2
-            ) AS attendance_percentage
+            ) AS attendance_percentage,
+            g.term1,
+            g.term2,
+            g.term3
         FROM students s
-        JOIN attendance a ON s.id = a.student_id
+        LEFT JOIN attendance a ON s.id = a.student_id
+        LEFT JOIN grades g ON s.id = g.student_id
         GROUP BY s.id
         HAVING 
             (SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) * 100.0) / COUNT(a.id)

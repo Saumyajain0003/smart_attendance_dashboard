@@ -1,10 +1,24 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
 from backend import schemas, crud
 
 app = FastAPI(title="Smart Attendance System")
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace with specific frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"status": "online", "message": "Smart Attendance API is running"}
 
 def get_db():
     db = SessionLocal()
