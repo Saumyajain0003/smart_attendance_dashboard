@@ -1,4 +1,9 @@
-import sqlite3
+import sys
+import os
+# Add project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from backend.database import engine
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -8,20 +13,16 @@ import joblib
 import os
 
 # Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "data", "database.db")
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "student_model.joblib")
 
 def train_model():
-    # 1. Load Data from SQLite
-    if not os.path.exists(DB_PATH):
-        print(f"Error: Database not found at {DB_PATH}. Run seed_data.py first.")
-        return
-
-    conn = sqlite3.connect(DB_PATH)
+    # 1. Load Data
     query = "SELECT term1, term2, term3, attendance_score, final_passed FROM grades"
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    try:
+        df = pd.read_sql_query(query, engine)
+    except Exception as e:
+        print(f"Error loading data: {e}. Ensure database is seeded.")
+        return
 
     if df.empty:
         print("Error: No data in 'grades' table. Run seed_data.py first.")

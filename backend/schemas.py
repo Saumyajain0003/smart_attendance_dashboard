@@ -4,8 +4,8 @@ class AttendanceRisk(BaseModel):
     student_id: int
     name: str
     student_code: str
-    total_classes: int
-    present_count: int
+    total_classes: Optional[int] = 0
+    present_count: Optional[int] = 0
     attendance_percentage: float
     term1: Optional[float] = 0.0
     term2: Optional[float] = 0.0

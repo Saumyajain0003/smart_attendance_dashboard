@@ -1,31 +1,25 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-def get_students_below_threshold(db: Session, threshold: int):
+def get_students_at_risk(db: Session, attendance_threshold: int = 75, grade_threshold: int = 50):
     query = text("""
         SELECT 
             s.id AS student_id,
             s.name,
             s.student_code,
-            COUNT(a.id) AS total_classes,
-            SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) AS present_count,
-            ROUND(
-                (SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) * 100.0) / COUNT(a.id),
-                2
-            ) AS attendance_percentage,
+            g.attendance_score AS attendance_percentage,
             g.term1,
             g.term2,
             g.term3
         FROM students s
-        LEFT JOIN attendance a ON s.id = a.student_id
-        LEFT JOIN grades g ON s.id = g.student_id
-        GROUP BY s.id
-        HAVING 
-            (SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) * 100.0) / COUNT(a.id)
-            < :threshold
+        INNER JOIN grades g ON s.id = g.student_id
+        WHERE 
+            (g.attendance_score < :att_t)
+            OR (g.term1 < :grade_t OR g.term2 < :grade_t OR g.term3 < :grade_t)
+        ORDER BY g.attendance_score ASC
     """)
 
-    return db.execute(query, {"threshold": threshold}).fetchall()
+    return db.execute(query, {"att_t": attendance_threshold, "grade_t": grade_threshold}).fetchall()
 
 def get_student_prediction_data(db: Session, student_id: int):
     query = text("""

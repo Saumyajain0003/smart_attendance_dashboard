@@ -44,14 +44,50 @@ const injectFonts = () => {
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const API_BASE = "http://localhost:8000";
 
-const fetchStudents = async () => {
+const fetchAtRisk = async (attT = 75, gradeT = 50) => {
   try {
-    const res = await fetch(`${API_BASE}/attendance/below-threshold?threshold=100`);
+    const res = await fetch(`${API_BASE}/attendance/at-risk?attendance_threshold=${attT}&grade_threshold=${gradeT}`);
     if (!res.ok) throw new Error("API Offline");
     return await res.json();
   } catch (e) {
     console.error("Fetch error:", e);
     return [];
+  }
+};
+
+const fetchAllStudents = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/students`);
+    if (!res.ok) throw new Error("API Offline");
+    return await res.json();
+  } catch (e) {
+    console.error("Fetch all error:", e);
+    return [];
+  }
+};
+
+const fetchStats = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/stats`);
+    if (!res.ok) throw new Error("API Offline");
+    return await res.json();
+  } catch (e) {
+    console.error("Stats error:", e);
+    return { total_students: 0, avg_attendance: 0 };
+  }
+};
+
+const uploadCSV = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const res = await fetch(`${API_BASE}/students/upload-csv`, {
+      method: "POST",
+      body: formData,
+    });
+    return await res.json();
+  } catch (e) {
+    return { status: "error", message: e.message };
   }
 };
 
@@ -322,6 +358,9 @@ function Predictor({ initial, toast }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+      <div style={{ fontSize: "0.85rem", color: G.muted, lineHeight: 1.5, marginBottom: "0.5rem" }}>
+        Adjust the sliders below to see how a student's final outcome changes based on their grades and attendance.
+      </div>
       {sliders.map(({ key, label, color }) => (
         <div key={key}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.45rem" }}>
@@ -371,6 +410,8 @@ function Predictor({ initial, toast }) {
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
   const [students, setStudents] = useState([]);
+  const [stats, setStats] = useState({ total_students: 0, avg_attendance: 0 });
+  const [showAll, setShowAll] = useState(false);
   const [toast, setToast] = useState({ msg: "", visible: false, type: "success" });
   const [predictInit, setPredictInit] = useState(null);
   const toastTimer = useRef(null);
@@ -378,11 +419,28 @@ export default function App() {
   useEffect(() => {
     injectFonts();
     load();
-  }, []);
+  }, [showAll]);
 
   const load = async () => {
-    const data = await fetchStudents();
-    setStudents(data);
+    const riskData = await fetchAtRisk();
+    const allData = await fetchAllStudents();
+    const statsData = await fetchStats();
+
+    setStudents(showAll ? allData : riskData);
+    setStats(statsData);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast("Importing CSV...", "success");
+    const res = await uploadCSV(file);
+    if (res.status === "success") {
+      showToast(res.message, "success");
+      load();
+    } else {
+      showToast(res.message, "error");
+    }
   };
 
   const showToast = useCallback((msg, type = "success") => {
@@ -450,17 +508,32 @@ export default function App() {
           }}>
             Predict Risk.<br />Save <span style={{ color: G.accent }}>Futures.</span>
           </h1>
-          <p style={{ color: G.muted, fontSize: "1rem", maxWidth: 480, lineHeight: 1.7 }}>
+          <p style={{ color: G.muted, fontSize: "1rem", maxWidth: 480, lineHeight: 1.7, marginBottom: "2rem" }}>
             Identify students at risk based on real attendance patterns and term results.
           </p>
+          <label style={{
+            display: "inline-flex", alignItems: "center", gap: 12,
+            background: `linear-gradient(135deg, ${G.accent2}, #5e43f3)`,
+            color: "#fff", padding: "0.85rem 1.6rem", borderRadius: 12,
+            cursor: "pointer", fontSize: "0.88rem", fontWeight: 700,
+            boxShadow: "0 10px 30px rgba(123,97,255,0.25)",
+            transition: "all 0.3s",
+          }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 15px 40px rgba(123,97,255,0.4)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(123,97,255,0.25)"; }}
+          >
+            <span style={{ fontSize: "1.2rem" }}>📥</span>
+            Import Student CSV
+            <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: "none" }} />
+          </label>
         </div>
 
         {/* STAT CARDS */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "1rem", marginBottom: "1.8rem" }}>
-          <StatCard label="At-Risk Students" value={students.filter(s => s.attendance_percentage < 75).length} sub="Below 75%" color={G.danger} icon="🔴" />
-          <StatCard label="Critical Zone" value={students.filter(s => s.attendance_percentage < 60).length} sub="Below 60%" color={G.warning} icon="⚡" />
-          <StatCard label="Loaded Items" value={students.length} sub="Connected to DB" color={G.accent} icon="📊" />
-          <StatCard label="System Status" value="Online" sub="API Active" color="#a78bfa" icon="🌍" />
+          <StatCard label="Total Enrolled" value={stats.total_students} sub="Directly from PostgreSQL" color={G.accent} icon="👥" />
+          <StatCard label="Avg Attendance" value={stats.avg_attendance + "%"} sub="Class Satisfaction" color={G.accent2} icon="📈" />
+          <StatCard label="Critical Risk" value={students.filter(s => s.attendance_percentage < 75).length} sub="Needs Attention" color={G.danger} icon="🚨" />
+          <StatCard label="Database Sync" value="Neon DB" sub="Active PostgreSQL" color={G.warning} icon="🗄️" />
         </div>
 
         {/* MAIN GRID */}
@@ -469,12 +542,32 @@ export default function App() {
           "@media(max-width:1000px)": { gridTemplateColumns: "1fr" }
         }}>
           {/* AT-RISK TABLE */}
-          <Panel title="Student Risk Registry">
+          <Panel
+            title={showAll ? "Complete Registry" : "Student Risk Registry"}
+            badge={showAll ? "Viewing All" : "Risk Only"}
+          >
+            <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowAll(!showAll)}
+                style={{
+                  background: showAll ? G.accent2 : "transparent",
+                  border: `1px solid ${G.accent2}`,
+                  color: showAll ? "#fff" : G.accent2,
+                  padding: "0.4rem 1rem",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                  fontWeight: 700
+                }}
+              >
+                {showAll ? "View Risk Only" : "Show All Students"}
+              </button>
+            </div>
             <StudentTable onPredict={handlePredict} onDelete={handleDelete} students={students} />
           </Panel>
 
-          {/* PREDICTOR */}
-          <Panel title="AI Failure Predictor" badge="POST /predict/realtime">
+          {/* SIMULATOR */}
+          <Panel title="Performance Simulator" badge="AI Powered">
             <Predictor initial={predictInit} toast={showToast} />
           </Panel>
         </div>
