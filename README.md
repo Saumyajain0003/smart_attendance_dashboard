@@ -26,6 +26,8 @@ The core "Smart" feature. The registry identifies students needing intervention 
 ## 🌟 Key Features
 
 -   **AI-Powered Risk Prediction**: Uses Scikit-learn (Random Forest) to predict the probability of a student passing based on attendance patterns and term marks.
+-   **Strict Data Validation**: Utilizes **Pydantic** models to ensure every API request and database entry adheres to a strict schema, preventing "dirty" data.
+-   **ORM & Type Safety**: Leverages **SQLAlchemy** (Object-Relational Mapping) to interact with PostgreSQL using Python classes, reducing raw SQL errors and enhancing maintainability.
 -   **Automated Data Ingestion**: Robust CSV upload pipeline with idempotent "UPSERT" logic (handles 100+ records seamlessly).
 -   **Production Database Architecture**: Fully integrated with **PostgreSQL (Neon.tech)** for scalable, persistent data storage.
 -   **Dynamic Risk Registry**: Real-time filtering and calculation of "At-Risk" status (Dual-Risk: Attendance < 75% OR Grades < 50%).
@@ -38,7 +40,8 @@ The core "Smart" feature. The registry identifies students needing intervention 
 
 ### **Backend**
 -   **FastAPI**: High-performance asynchronous API framework.
--   **SQLAlchemy**: Professional ORM for database abstraction.
+-   **SQLAlchemy**: Professional ORM (Object Relational Mapper) for robust database abstraction and data integrity.
+-   **Pydantic**: Strict data validation and settings management using Python type annotations.
 -   **PostgreSQL**: Production-grade relational database (via Neon).
 -   **Scikit-Learn**: Machine Learning library for predictive modeling.
 
