@@ -2,6 +2,25 @@
 
 **AcademiQ** is a production-grade predictive analytics platform designed to transform raw student data into actionable academic insights. By combining a high-performance **FastAPI** backend with a modern **React** frontend and **Machine Learning**, AcademiQ proactively identifies "At-Risk" students before they fall through the cracks.
 
+
+## 📸 Project Walkthrough
+
+### **1. AI-Driven Analytics Dashboard**
+The main interface provides high-level statistics pulled directly from the PostgreSQL backend, showing total enrollment and average class attendance using glassmorphism aesthetics.
+![Dashboard Screenshot](screenshots/Dashboard.png)
+
+### **2. Managed Database (Neon PostgreSQL)**
+AcademiQ is fully integrated with Neon's serverless PostgreSQL. The backend automatically initializes these tables on first launch, ensuring a production-ready data schema.
+![Database Schema](screenshots/tables%20created%20.png)
+
+### **3. Smart Data Ingestion**
+Every CSV import triggers an idempotent pipeline. It identifies unique students, handles conflicts gracefully, and propagates data instantly across the analytics layer.
+![Data Ingestion Proof](screenshots/data%20ingested%20in%20neondb.png)
+
+### **4. Predictive Risk Registry**
+The core "Smart" feature. The registry identifies students needing intervention based on low attendance or failing term marks, with real-time AI prediction confidence.
+![At-Risk Registry](screenshots/Atrisk%20Students.png)
+
 ---
 
 ## 🌟 Key Features
@@ -53,6 +72,28 @@ python start_app.py
 ```
 -   **Dashboard**: `http://localhost:5173`
 -   **API Docs**: `http://localhost:8000/docs`
+
+---
+
+## 📂 CSV Import Template
+
+To ensure successful data ingestion, your CSV file must follow this exact header structure:
+
+| Header | Description | Example |
+| :--- | :--- | :--- |
+| `name` | Full name of the student | John Doe |
+| `email` | Unique student email | john@example.com |
+| `student_code` | Unique identification code | S1001 |
+| `term1` | First term marks (0-100) | 85 |
+| `term2` | Second term marks (0-100) | 78 |
+| `term3` | Third term marks (0-100) | 92 |
+| `attendance_score` | Overall attendance percentage | 88.5 |
+
+### **Sample Row**
+```csv
+name,email,student_code,term1,term2,term3,attendance_score
+Saumya Jain,saumya@example.com,S1234,90,85,88,95.5
+```
 
 ---
 
